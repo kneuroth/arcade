@@ -23,8 +23,6 @@ class AbstractArtScene extends Scene {
   private baseHue: number = 0;
   private isDragging: boolean = false;
   private dragShape: ExpandingShape | null = null;
-  private lastTrailSpawn: number = 0;
-  private readonly TRAIL_SPAWN_INTERVAL = 200; // ms between trail shapes (5 per second)
   private baseHueForDrag: number = 0; // Track the base hue for the current drag
 
   constructor() {
@@ -77,7 +75,6 @@ class AbstractArtScene extends Scene {
 
   private startDrag(x: number, y: number): void {
     this.isDragging = true;
-    this.lastTrailSpawn = Date.now();
 
     // Create a random shape that follows the drag
     const { width } = this.cameras.main;
@@ -141,13 +138,7 @@ class AbstractArtScene extends Scene {
     this.dragShape.hue = hue;
     this.dragShape.color = this.hsvToColor(hue / 360, 0.8, 0.9);
 
-    // Spawn trail shapes - 5 per second, using current shape color
-    const now = Date.now();
     this.spawnTrailShape(x, y);
-    // if (now - this.lastTrailSpawn >= this.TRAIL_SPAWN_INTERVAL) {
-
-    //   this.lastTrailSpawn = now;
-    // }
 
     // Update rotation
     this.dragShape.rotation += this.dragShape.rotationSpeed;
@@ -239,7 +230,7 @@ class AbstractArtScene extends Scene {
   }
 
   private drawShape(shape: ExpandingShape): void {
-    const { graphics, x, y, radius, sides, rotation, color, age } = shape;
+    const { graphics, x, y, radius, sides, rotation, color } = shape;
 
     graphics.clear();
 
