@@ -521,12 +521,6 @@ export const createGravityGame = (): GameConfig => {
           debug: false,
         },
       },
-    },
-    {
-      isMobileCompatible: true,
-      usesTouchControls: true,
-      mobileDescription: "Tap left/right to move, tap jump button to jump and rotate gravity",
-      minWidth: 400,
     }
   );
   config.bannerArt = getAssetPath("/images/games/gravity-rotator/banner.png");

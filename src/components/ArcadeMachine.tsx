@@ -15,7 +15,9 @@ function ArcadeMachine({
   const screenRef = useRef<HTMLDivElement>(null);
 
   const handleSelectGame = () => {
-    setIsExpanded(true);
+    if (gameConfig) {
+      setIsExpanded(true);
+    }
   };
 
   const handleClose = () => {
@@ -78,7 +80,11 @@ function ArcadeMachine({
 
   return (
     <div className="w-full max-w-sm md:max-w-md" onClick={handleSelectGame}>
-      <div className="bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 rounded-xl p-3 md:p-5 shadow-2xl transform transition-transform hover:scale-105 cursor-pointer border-2 border-gray-700">
+      <div
+        className={`bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 rounded-xl p-3 md:p-5 shadow-2xl transform transition-transform border-2 border-gray-700 ${
+          gameConfig ? "hover:scale-105 cursor-pointer" : "opacity-75"
+        }`}
+      >
         {/* Arcade Machine Top / Banner */}
         <div className="bg-gradient-to-b from-gray-800 to-gray-700 rounded-t-lg aspect-[4/1] mb-3 flex items-center justify-center relative overflow-hidden min-h-[60px] border-2 border-gray-600 shadow-inner">
           {gameConfig?.bannerArt ? (
@@ -88,7 +94,9 @@ function ArcadeMachine({
               className="w-full h-full object-contain p-1"
             />
           ) : (
-            <div className="w-16 md:w-24 h-4 md:h-6 bg-gray-900 rounded-full"></div>
+            <div className="text-gray-300 text-[8px] md:text-xs text-center px-2">
+              {gameName || "Coming Soon!"}
+            </div>
           )}
           {/* Mobile Compatibility Badge */}
           {gameConfig?.mobile?.isMobileCompatible && (
@@ -127,7 +135,11 @@ function ArcadeMachine({
               </div>
             </>
           ) : (
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-900/20 to-purple-900/20"></div>
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-900/20 to-purple-900/20 flex items-center justify-center">
+              <p className="text-gray-400 text-xs md:text-sm text-center px-4">
+                {gameName || "More Games Coming Soon!"}
+              </p>
+            </div>
           )}
           {/* Screen bezel inner shadow */}
           <div className="absolute inset-0 border-2 border-black/50 rounded-lg pointer-events-none"></div>
