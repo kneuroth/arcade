@@ -1,7 +1,6 @@
 import ArcadeMachine from "./components/ArcadeMachine";
 // Example: Import a game and pass it to ArcadeMachine
 import { createPongGame } from "./games/pong/pongGame";
-import { createBMXGame } from "./games/bmx/bmxGame";
 import { createGravityGame } from "./games/gravity/gravityGame";
 
 function App() {

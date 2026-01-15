@@ -80,7 +80,7 @@ export const platformChain = (
   const shapes: MapShape[] = [];
   let currentX = startX;
 
-  platforms.forEach((platform, index) => {
+  platforms.forEach((platform) => {
     const y = platform.y !== undefined ? platform.y : startY;
     const height = platform.height || 50;
 
