@@ -1,5 +1,6 @@
 import { Scene } from "phaser";
 import { GameConfig, createGameConfig } from "../../types/game";
+import { getAssetPath } from "../../utils/assetPath";
 
 class PongGameScene extends Scene {
   private leftPaddle!: Phaser.GameObjects.Rectangle;
@@ -374,8 +375,8 @@ export const createPongGame = (): GameConfig => {
       minWidth: 320,
     }
   );
-  config.bannerArt = "/images/games/pong/banner.png";
-  config.screenArt = "/images/games/pong/screen.png";
+  config.bannerArt = getAssetPath("/images/games/pong/banner.png");
+  config.screenArt = getAssetPath("/images/games/pong/screen.png");
   return config;
 };
 

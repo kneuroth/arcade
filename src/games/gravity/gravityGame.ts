@@ -1,6 +1,7 @@
 import { Scene } from "phaser";
 import { GameConfig, createGameConfig } from "../../types/game";
 import { getMapData } from "./maps";
+import { getAssetPath } from "../../utils/assetPath";
 
 enum GravityDirection {
   Down = 0,   // Normal gravity
@@ -528,8 +529,8 @@ export const createGravityGame = (): GameConfig => {
       minWidth: 400,
     }
   );
-  config.bannerArt = "/images/games/gravity-rotator/banner.png";
-  config.screenArt = "/images/games/gravity-rotator/screen.png";
+  config.bannerArt = getAssetPath("/images/games/gravity-rotator/banner.png");
+  config.screenArt = getAssetPath("/images/games/gravity-rotator/screen.png");
   return config;
 };
 
