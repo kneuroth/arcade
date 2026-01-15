@@ -2,6 +2,7 @@ import ArcadeMachine from "./components/ArcadeMachine";
 // Example: Import a game and pass it to ArcadeMachine
 import { createPongGame } from "./games/pong/pongGame";
 import { createGravityGame } from "./games/gravity/gravityGame";
+import { createFractalGame } from "./games/fractal/fractalGame";
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
         <div className="flex flex-wrap justify-center gap-6 md:gap-8">
           {/* Pass gameConfig prop to add a Phaser game */}
           <ArcadeMachine gameConfig={createPongGame()} />
+          <ArcadeMachine gameConfig={createFractalGame()} />
           <ArcadeMachine gameConfig={createGravityGame()} />
           <ArcadeMachine gameName="More Games Coming Soon!" />
         </div>

@@ -8,6 +8,7 @@ import { GameConfig } from '../types/game'
 // import { createSnakeGame } from './snake/snakeGame'
 // import { createPongGame } from './pong/pongGame'
 import { createGravityGame } from './gravity/gravityGame'
+import { createFractalGame } from './fractal/fractalGame'
 
 /**
  * Get all available game configs
@@ -16,6 +17,7 @@ import { createGravityGame } from './gravity/gravityGame'
 export const getAllGames = (): GameConfig[] => {
   return [
     createGravityGame(),
+    createFractalGame(),
     // createExampleGame(),
     // createSnakeGame(),
     // createPongGame(),

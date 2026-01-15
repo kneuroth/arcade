@@ -95,7 +95,7 @@ function ArcadeMachine({
             />
           ) : (
             <div className="text-gray-300 text-[8px] md:text-xs text-center px-2">
-              {gameName || "Coming Soon!"}
+              {gameConfig?.name || gameName || "Coming Soon!"}
             </div>
           )}
           {/* Mobile Compatibility Badge */}
@@ -137,7 +137,7 @@ function ArcadeMachine({
           ) : (
             <div className="absolute inset-0 bg-gradient-to-br from-blue-900/20 to-purple-900/20 flex items-center justify-center">
               <p className="text-gray-400 text-xs md:text-sm text-center px-4">
-                {gameName || "More Games Coming Soon!"}
+                {gameConfig?.name || gameName || "More Games Coming Soon!"}
               </p>
             </div>
           )}
