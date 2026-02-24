@@ -1,59 +1,49 @@
-# Arcade
+# Kelly's Virtual Arcade
 
-A collection of retro-style arcade games built with Phaser 3 and React.
+A retro arcade machine simulator with multiple playable mini-games. Built with React, Phaser 3, and TypeScript.
+
+**Live site**: deployed to GitHub Pages at `https://<username>.github.io/arcade/`
+
+---
 
 ## Games
 
-- **Gravity Rotator**: A platformer where jumping rotates gravity through four directions
-- **Pong**: Classic Pong game
-- More games coming soon!
+| Game | Description |
+|------|-------------|
+| **Paddle Master** | Pong variant with rally counter, ball speed scaling, and color trails |
+| **Gravity Rotator** | Platformer where jumping rotates gravity through four directions — collect all coins to advance |
+| **Abstract Art Creator** | Drag to spawn expanding, color-cycling geometric shapes |
+| **BMX Hero** | Physics-based stunt bike game *(in development)* |
+
+---
 
 ## Development
 
 ```bash
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-
-# Build for production
-npm run build
-
-# Preview production build
-npm run preview
+npm install      # Install dependencies
+npm run dev      # Start dev server with hot reload
+npm run build    # Build for production
+npm run preview  # Preview the production build locally
 ```
 
-## Deployment to GitHub Pages
+### Adding a Game
 
-This project is configured to automatically deploy to GitHub Pages when you push to the `main` or `master` branch.
+1. Create `src/games/myGame/myGame.ts` extending `Phaser.Scene`
+2. Export a config using `createGameConfig()` from `src/types/game.ts`
+3. Add banner (600×150px) and screen (800×450px) art to `public/images/games/myGame/`
+4. Import and add the config to the games array in `src/App.tsx`
 
-### Setup Instructions
+See `src/games/README.md` for a detailed walkthrough.
 
-1. **Push your code to GitHub**:
-   ```bash
-   git add .
-   git commit -m "Initial commit"
-   git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
-   git push -u origin main
-   ```
+---
 
-2. **Enable GitHub Pages**:
-   - Go to your repository on GitHub
-   - Navigate to **Settings** → **Pages**
-   - Under **Source**, select **GitHub Actions**
-   - The workflow will automatically deploy on the next push to `main` or `master`
+## Deployment
 
-3. **Configure base path (if needed)**:
-   - If your repository name is different from your GitHub Pages URL (e.g., `username.github.io/repo-name`), update `vite.config.ts`:
-     ```typescript
-     base: '/your-repo-name/',
-     ```
+Pushing to `main` or `master` automatically builds and deploys to GitHub Pages via GitHub Actions.
 
-4. **Access your site**:
-   - After deployment, your site will be available at:
-     - `https://YOUR_USERNAME.github.io/YOUR_REPO_NAME/` (if using a repository name)
-     - `https://YOUR_USERNAME.github.io/` (if using a user/organization page)
+**First-time setup:**
+1. Push to GitHub
+2. Go to **Settings → Pages** and set source to **GitHub Actions**
+3. The workflow will deploy on the next push
 
-The GitHub Actions workflow will automatically build and deploy your site whenever you push changes to the main branch.
-
+If your repo name differs from `arcade`, update `base` in `vite.config.ts` to match.
