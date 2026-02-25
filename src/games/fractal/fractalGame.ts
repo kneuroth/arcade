@@ -1,5 +1,6 @@
 import { Scene } from "phaser";
 import { GameConfig, createGameConfig } from "../../types/game";
+import { hsvToColor } from "../../utils/color";
 
 interface ExpandingShape {
   id: string;
@@ -90,7 +91,7 @@ class AbstractArtScene extends Scene {
     this.baseHue = (this.baseHue + Phaser.Math.Between(20, 60)) % 360;
     this.baseHueForDrag = this.baseHue; // Store the base hue for this drag
     const hue = (this.baseHue + normalizedX * 60) % 360;
-    const color = this.hsvToColor(hue / 360, 0.8, 0.9);
+    const color = hsvToColor(hue / 360, 0.8, 0.9);
 
     // Create graphics object
     const graphics = this.add.graphics();
@@ -136,7 +137,7 @@ class AbstractArtScene extends Scene {
     const hueVariation = Math.sin(this.dragShape.age * 0.01) * 15; // Oscillate within range
     const hue = (this.baseHueForDrag + hueVariation) % 360;
     this.dragShape.hue = hue;
-    this.dragShape.color = this.hsvToColor(hue / 360, 0.8, 0.9);
+    this.dragShape.color = hsvToColor(hue / 360, 0.8, 0.9);
 
     this.spawnTrailShape(x, y);
 
@@ -200,33 +201,6 @@ class AbstractArtScene extends Scene {
     });
 
     this.isDragging = false;
-  }
-
-  private hsvToColor(h: number, s: number, v: number): number {
-    const c = v * s;
-    const x = c * (1 - Math.abs(((h * 6) % 2) - 1));
-    const m = v - c;
-    let r = 0, g = 0, b = 0;
-
-    if (h * 6 < 1) {
-      r = c; g = x; b = 0;
-    } else if (h * 6 < 2) {
-      r = x; g = c; b = 0;
-    } else if (h * 6 < 3) {
-      r = 0; g = c; b = x;
-    } else if (h * 6 < 4) {
-      r = 0; g = x; b = c;
-    } else if (h * 6 < 5) {
-      r = x; g = 0; b = c;
-    } else {
-      r = c; g = 0; b = x;
-    }
-
-    return Phaser.Display.Color.GetColor(
-      Math.round((r + m) * 255),
-      Math.round((g + m) * 255),
-      Math.round((b + m) * 255)
-    );
   }
 
   private drawShape(shape: ExpandingShape): void {

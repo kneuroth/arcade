@@ -1,6 +1,7 @@
 import { Scene } from "phaser";
 import { GameConfig, createGameConfig } from "../../types/game";
 import { getAssetPath } from "../../utils/assetPath";
+import { hsvToColor } from "../../utils/color";
 
 class PongGameScene extends Scene {
   private leftPaddle!: Phaser.GameObjects.Rectangle;
@@ -284,36 +285,9 @@ class PongGameScene extends Scene {
     this.hue = 0;
   }
 
-  private hsvToColor(h: number, s: number, v: number): number {
-    const c = v * s;
-    const x = c * (1 - Math.abs(((h * 6) % 2) - 1));
-    const m = v - c;
-    let r = 0, g = 0, b = 0;
-
-    if (h * 6 < 1) {
-      r = c; g = x; b = 0;
-    } else if (h * 6 < 2) {
-      r = x; g = c; b = 0;
-    } else if (h * 6 < 3) {
-      r = 0; g = c; b = x;
-    } else if (h * 6 < 4) {
-      r = 0; g = x; b = c;
-    } else if (h * 6 < 5) {
-      r = x; g = 0; b = c;
-    } else {
-      r = c; g = 0; b = x;
-    }
-
-    return Phaser.Display.Color.GetColor(
-      Math.round((r + m) * 255),
-      Math.round((g + m) * 255),
-      Math.round((b + m) * 255)
-    );
-  }
-
   private updateTrail() {
     // Add current ball position to trail
-    const colorValue = this.hsvToColor(this.hue / 360, 1, 1);
+    const colorValue = hsvToColor(this.hue / 360, 1, 1);
 
     this.trailPoints.push({
       x: this.ball.x,
@@ -351,7 +325,7 @@ class PongGameScene extends Scene {
 
     // Update ball color based on rally
     const intensity = Math.min(this.rallyCount / 10, 1);
-    const ballColor = this.hsvToColor(this.hue / 360, 1, 0.5 + intensity * 0.5);
+    const ballColor = hsvToColor(this.hue / 360, 1, 0.5 + intensity * 0.5);
     this.ball.setFillStyle(ballColor);
   }
 }
@@ -369,8 +343,8 @@ export const createPongGame = (): GameConfig => {
     PongGameScene,
     undefined,
     {
-      isMobileCompatible: false,
-      usesTouchControls: false,
+      isMobileCompatible: true,
+      usesTouchControls: true,
       mobileDescription: "Drag paddles to hit the ball. Longer rallies = faster ball & colorful trails!",
       minWidth: 320,
     }

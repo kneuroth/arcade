@@ -1,15 +1,18 @@
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import PhaserGame from "./PhaserGame";
-import { GameConfig } from "../types/game";
+import { GameConfig, GameEventCallback } from "../types/game";
 
 interface ArcadeMachineProps {
   gameConfig?: GameConfig;
   gameName?: string;
+  onGameEvent?: GameEventCallback;
 }
 
 function ArcadeMachine({
   gameConfig,
   gameName = "Game 1",
+  onGameEvent,
 }: ArcadeMachineProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const screenRef = useRef<HTMLDivElement>(null);
@@ -35,50 +38,51 @@ function ArcadeMachine({
     return () => window.removeEventListener("keydown", handleEscape);
   }, [isExpanded]);
 
-  if (isExpanded) {
-    return (
-      <div className="w-full max-w-6xl mx-auto">
-        <div className="bg-gray-900 rounded-lg p-4 md:p-6 shadow-2xl">
-          <div className="flex justify-between items-center mb-4">
-            <div className="flex items-center gap-3">
-              <h2 className="text-xl md:text-2xl font-bold text-white">
-                {gameConfig?.name || gameName}
-              </h2>
-              {gameConfig?.mobile?.isMobileCompatible && (
-                <div className="flex items-center gap-1 bg-green-600/20 text-green-400 text-xs px-2 py-1 rounded">
-                  <span>📱</span>
-                  <span>Mobile</span>
-                </div>
-              )}
-            </div>
-            <button
-              onClick={handleClose}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm md:text-base"
-            >
-              Close (ESC)
-            </button>
-          </div>
-          <div
-            ref={screenRef}
-            className="bg-black rounded-lg aspect-video border-4 border-gray-700 overflow-hidden"
-            style={{ minHeight: "400px" }}
-          >
-            {gameConfig ? (
-              <PhaserGame gameConfig={gameConfig} isActive={isExpanded} />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <p className="text-gray-400 text-sm md:text-base">
-                  No game configured
-                </p>
+  const modal = isExpanded && createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
+    >
+      <div className="bg-gray-900 rounded-lg p-4 md:p-6 shadow-2xl w-full max-w-5xl">
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl md:text-2xl font-bold text-white">
+              {gameConfig?.name || gameName}
+            </h2>
+            {gameConfig?.mobile?.isMobileCompatible && (
+              <div className="flex items-center gap-1 bg-green-600/20 text-green-400 text-xs px-2 py-1 rounded">
+                <span>📱</span>
+                <span>Mobile</span>
               </div>
             )}
           </div>
+          <button
+            onClick={handleClose}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm md:text-base"
+          >
+            Close (ESC)
+          </button>
+        </div>
+        <div
+          ref={screenRef}
+          className="bg-black rounded-lg aspect-video border-4 border-gray-700 overflow-hidden"
+        >
+          {gameConfig ? (
+            <PhaserGame gameConfig={gameConfig} isActive={isExpanded} onGameEvent={onGameEvent} />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <p className="text-gray-400 text-sm md:text-base">No game configured</p>
+            </div>
+          )}
         </div>
       </div>
-    );
-  }
+    </div>,
+    document.body,
+  );
 
   return (
+    <>
+    {modal}
     <div className="w-full max-w-sm md:max-w-md" onClick={handleSelectGame}>
       <div
         className={`bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 rounded-xl p-3 md:p-5 shadow-2xl transform transition-transform border-2 border-gray-700 ${
@@ -161,6 +165,7 @@ function ArcadeMachine({
         <div className="bg-gradient-to-b from-gray-700 to-gray-800 rounded-b-lg h-4 md:h-6 border-t-2 border-gray-600"></div>
       </div>
     </div>
+    </>
   );
 }
 

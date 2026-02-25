@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Game } from "phaser";
-import { GameConfig } from "../types/game";
+import { GameConfig, GameEvent, GameEventCallback } from "../types/game";
 
 interface PhaserGameProps {
   gameConfig: GameConfig;
   isActive: boolean;
+  onGameEvent?: GameEventCallback;
 }
 
-function PhaserGame({ gameConfig, isActive }: PhaserGameProps) {
+function PhaserGame({ gameConfig, isActive, onGameEvent }: PhaserGameProps) {
   const gameRef = useRef<Game | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isReady, setIsReady] = useState(false);
@@ -49,16 +50,39 @@ function PhaserGame({ gameConfig, isActive }: PhaserGameProps) {
     };
   }, []);
 
+  // Forward Phaser game events to React via onGameEvent callback
+  useEffect(() => {
+    if (!gameRef.current || !onGameEvent || !isReady) return
+
+    const handler = (event: GameEvent) => onGameEvent(event)
+    gameRef.current.events.on('game-event', handler)
+    return () => {
+      gameRef.current?.events.off('game-event', handler)
+    }
+  }, [onGameEvent, isReady])
+
+  // Prevent page scrolling while a game is active (Space, Shift+Space, arrow keys, etc.)
+  useEffect(() => {
+    if (!isActive) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [isActive]);
+
   // Handle resize
   useEffect(() => {
     if (!gameRef.current || !containerRef.current || !isActive) return;
 
     const handleResize = () => {
       if (gameRef.current && containerRef.current) {
-        gameRef.current.scale.resize(
-          containerRef.current.clientWidth,
-          containerRef.current.clientHeight
-        );
+        const w = containerRef.current.clientWidth
+        const h = containerRef.current.clientHeight
+        gameRef.current.scale.resize(w, h)
+        gameRef.current.scene.getScenes(true).forEach((scene) => {
+          if (typeof (scene as any).onResize === 'function') {
+            ;(scene as any).onResize(w, h)
+          }
+        })
       }
     };
 

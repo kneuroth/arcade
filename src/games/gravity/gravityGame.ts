@@ -1,98 +1,105 @@
-import { Scene } from "phaser";
-import { GameConfig, createGameConfig } from "../../types/game";
-import { getMapData } from "./maps";
-import { getAssetPath } from "../../utils/assetPath";
+import { GameConfig, createGameConfig } from '../../types/game';
+import { BaseGameScene } from '../templates/BaseGameScene';
+import { getMapData, getMapCount } from './maps';
+import { getAssetPath } from '../../utils/assetPath';
+import {
+  PLAYER_DRAG, PLAYER_BOUNCE,
+  WORLD_WIDTH, WORLD_HEIGHT, DEPTH, BG_COLORS, COLOR,
+  PLAYER_W, PLAYER_H, COIN_SIZE, COIN_RADIUS, INDICATOR,
+  COYOTE_MS, JUMP_BUFFER_MS,
+} from './constants';
+import { GravityDirection, DIRECTION_HANDLERS } from './gravityDirections';
 
-enum GravityDirection {
-  Down = 0,   // Normal gravity
-  Right = 1,  // Gravity pulls right
-  Up = 2,     // Gravity pulls up
-  Left = 3    // Gravity pulls left
-}
-
-class GravityGameScene extends Scene {
+class GravityGameScene extends BaseGameScene {
   private player!: Phaser.Physics.Arcade.Sprite;
   private platforms!: Phaser.Physics.Arcade.StaticGroup;
   private coins!: Phaser.Physics.Arcade.Group;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
+  private keyLeft!: Phaser.Input.Keyboard.Key;
+  private keyRight!: Phaser.Input.Keyboard.Key;
   private spaceKey!: Phaser.Input.Keyboard.Key;
+  private shiftKey!: Phaser.Input.Keyboard.Key;
   private currentGravity: GravityDirection = GravityDirection.Down;
   private gravityIndicator!: Phaser.GameObjects.Graphics;
   private coinCountText!: Phaser.GameObjects.Text;
-  private totalCoins: number = 0;
-  private collectedCoins: number = 0;
-  private currentMapIndex: number = 0;
   private mapCompleteText!: Phaser.GameObjects.Text;
-  private gravityForce: number = 800; // Gravity strength
-  private jumpForce: number = 400; // Jump velocity
-  private mapBounds!: Phaser.GameObjects.Image;
+  private totalCoins = 0;
+  private collectedCoins = 0;
+  private currentMapIndex = 0;
+  private lastGroundedTime = -Infinity; // timestamp when last grounded (for coyote)
+  private jumpBufferTime   = -Infinity; // timestamp when Space was pressed (buffer)
+  private pendingJumpDir   = GravityDirection.Down; // gravity dir chosen at jump press
+  private wasGrounded      = true;      // previous frame grounded state (for land detection)
 
   constructor() {
-    super({ key: "GravityGame" });
+    super({ key: 'GravityGame' });
   }
 
   create() {
     const { width, height } = this.cameras.main;
 
-    // Set background
-    this.cameras.main.setBackgroundColor("#1a1a2e");
+    this.physics.world.gravity.y = 0; // gravity applied manually per-body each frame
 
-    // Initialize physics
-    this.physics.world.gravity.y = 0; // We'll handle gravity manually
-
-    // Create platforms group
     this.platforms = this.physics.add.staticGroup();
-
-    // Create coins group
     this.coins = this.physics.add.group();
 
-    // Create gravity indicator (fixed to camera)
+    // HUD — gravity arrow
     this.gravityIndicator = this.add.graphics();
-    this.gravityIndicator.setScrollFactor(0, 0); // Fix to camera, not world
-    this.gravityIndicator.setDepth(1000); // On top of everything
-    this.updateGravityIndicator();
+    this.gravityIndicator.setScrollFactor(0);
+    this.gravityIndicator.setDepth(DEPTH.UI);
 
-    // Create UI (must be created before loadMap since it calls updateCoinText)
-    this.coinCountText = this.add.text(20, 20, "Coins: 0/0", {
-      fontSize: "24px",
-      color: "#ffffff",
-      fontFamily: "Arial",
+    // HUD — coin counter
+    this.coinCountText = this.add.text(20, 20, 'Coins: 0/0', {
+      fontSize: '24px',
+      color: '#ffffff',
+      fontFamily: 'Arial',
     });
-    this.coinCountText.setScrollFactor(0, 0); // Fix to camera
-    this.coinCountText.setDepth(1000); // On top
+    this.coinCountText.setScrollFactor(0);
+    this.coinCountText.setDepth(DEPTH.UI);
 
-    this.mapCompleteText = this.add.text(width / 2, height / 2, "", {
-      fontSize: "32px",
-      color: "#00ff00",
-      fontFamily: "Arial",
+    // HUD — map complete overlay (camera-relative so it always appears centred)
+    this.mapCompleteText = this.add.text(width / 2, height / 2, '', {
+      fontSize: '32px',
+      color: '#00ff00',
+      fontFamily: 'Arial',
     });
     this.mapCompleteText.setOrigin(0.5);
+    this.mapCompleteText.setScrollFactor(0);
     this.mapCompleteText.setVisible(false);
-    this.mapCompleteText.setDepth(1000); // Ensure it's on top of everything
+    this.mapCompleteText.setDepth(DEPTH.UI);
 
-    // Setup controls
-    this.cursors = this.input.keyboard!.createCursorKeys();
+    // Input — cached once, never recreated inside update()
+    this.cursors  = this.input.keyboard!.createCursorKeys();
     this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    this.keyLeft  = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A);
+    this.keyRight = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+    this.shiftKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
 
-    // Load first map (after UI is created)
+    // Shared textures created once; reused across every map load
+    this.ensureSharedTextures();
+
+    // World boundary outline (drawn once at world origin)
+    this.drawBoundaryRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT, COLOR.BOUNDARY, 8, DEPTH.MAP_BOUNDS);
+
+    this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    this.cameras.main.setBackgroundColor(BG_COLORS[GravityDirection.Down]);
+
     this.loadMap(0);
-
-    // Setup camera to follow player (after player is created)
-    this.cameras.main.startFollow(this.player);
-    // Set camera bounds to accommodate larger maps
-    this.cameras.main.setBounds(0, 0, 2000, 1000);
-
-    // Create visible map boundaries
-    this.createMapBoundaries();
   }
 
+  /** Reposition camera-relative UI when the canvas resizes. */
+  onResize(width: number, height: number) {
+    this.mapCompleteText?.setPosition(width / 2, height / 2);
+  }
+
+  // ----------------------------------------------------------------
+  // Map loading
+  // ----------------------------------------------------------------
+
   private loadMap(mapIndex: number) {
-    // Clear existing map elements
     this.platforms.clear(true, true);
     this.coins.clear(true, true);
-    if (this.player) {
-      this.player.destroy();
-    }
+    if (this.player) this.player.destroy();
 
     const mapData = getMapData(mapIndex);
     if (!mapData) {
@@ -101,430 +108,270 @@ class GravityGameScene extends Scene {
     }
 
     this.currentMapIndex = mapIndex;
-    this.collectedCoins = 0;
+    this.collectedCoins  = 0;
 
-    // Reset camera position
     this.cameras.main.stopFollow();
     this.cameras.main.setScroll(0, 0);
 
-    // Update map boundaries
-    this.updateMapBoundaries();
-
-    // Create platforms
-    mapData.platforms.forEach((platform) => {
-      const platformSprite = this.platforms.create(
-        platform.x + platform.width / 2,
-        platform.y + platform.height / 2,
-        undefined
+    // Platforms — identical dimensions share one cached texture
+    for (const p of mapData.platforms) {
+      const key = this.ensurePlatformTexture(p.width, p.height);
+      const sprite = this.platforms.create(
+        p.x + p.width  / 2,
+        p.y + p.height / 2,
+        key,
       ) as Phaser.Physics.Arcade.Sprite;
+      sprite.setDisplaySize(p.width, p.height);
+      sprite.refreshBody();
+    }
 
-      // Create graphics for platform
-      const graphics = this.add.graphics();
-      graphics.fillStyle(0x654321);
-      graphics.fillRect(0, 0, platform.width, platform.height);
-      graphics.generateTexture(`platform_${platform.x}_${platform.y}`, platform.width, platform.height);
-      graphics.destroy();
-
-      platformSprite.setTexture(`platform_${platform.x}_${platform.y}`);
-      platformSprite.setDisplaySize(platform.width, platform.height);
-      platformSprite.refreshBody();
-    });
-
-    // Create coins
-    mapData.coins.forEach((coin) => {
-      const coinSprite = this.coins.create(coin.x, coin.y, undefined) as Phaser.Physics.Arcade.Sprite;
-
-      // Create graphics for coin
-      const graphics = this.add.graphics();
-      graphics.fillStyle(0xffd700);
-      graphics.fillCircle(16, 16, 16);
-      graphics.fillStyle(0xffaa00);
-      graphics.fillCircle(16, 16, 12);
-      graphics.generateTexture(`coin_${coin.x}_${coin.y}`, 32, 32);
-      graphics.destroy();
-
-      coinSprite.setTexture(`coin_${coin.x}_${coin.y}`);
-      coinSprite.setDisplaySize(32, 32);
-      coinSprite.setCircle(16);
-      // Coins don't need gravity - they're static collectibles
-    });
+    // Coins — all share one 'coin' texture
+    for (const c of mapData.coins) {
+      const sprite = this.coins.create(c.x, c.y, 'coin') as Phaser.Physics.Arcade.Sprite;
+      sprite.setDisplaySize(COIN_SIZE, COIN_SIZE);
+      sprite.setCircle(COIN_RADIUS);
+    }
 
     this.totalCoins = mapData.coins.length;
     this.updateCoinText();
 
-    // Create player
-    const graphics = this.add.graphics();
-    graphics.fillStyle(0x00ff00);
-    graphics.fillRect(0, 0, 24, 32);
-    graphics.fillStyle(0x00cc00);
-    graphics.fillRect(4, 4, 16, 24);
-    graphics.generateTexture("player", 24, 32);
-    graphics.destroy();
-
-    this.player = this.physics.add.sprite(mapData.spawn.x, mapData.spawn.y, "player");
+    // Player
+    this.player = this.physics.add.sprite(mapData.spawn.x, mapData.spawn.y, 'player');
     this.player.setCollideWorldBounds(true);
-    this.player.setBounce(0.1);
-    this.player.setDrag(100, 100);
+    this.player.setBounce(PLAYER_BOUNCE);
+    this.player.setDrag(PLAYER_DRAG, PLAYER_DRAG);
 
-    // Get default world bounds (Phaser sets these automatically based on game size)
-    // and create visual boundaries based on those
-    const worldBounds = this.physics.world.bounds;
-    this.createWorldBoundaryLines(worldBounds.width, worldBounds.height);
-
-    // Collisions
     this.physics.add.collider(this.player, this.platforms);
-    this.physics.add.overlap(this.player, this.coins, this.collectCoin as Phaser.Types.Physics.Arcade.ArcadePhysicsCallback, undefined, this);
+    this.physics.add.overlap(
+      this.player,
+      this.coins,
+      this.collectCoin as Phaser.Types.Physics.Arcade.ArcadePhysicsCallback,
+      undefined,
+      this,
+    );
 
-    // Reset gravity to down
-    this.currentGravity = GravityDirection.Down;
-    this.updateGravityIndicator();
-
-    // Restart camera following after player is created
+    this.currentGravity   = GravityDirection.Down;
+    this.cameras.main.setBackgroundColor(BG_COLORS[this.currentGravity]);
+    this.lastGroundedTime = -Infinity;
+    this.jumpBufferTime   = -Infinity;
+    this.wasGrounded      = true;
     this.cameras.main.startFollow(this.player);
   }
 
-  private createMapBoundaries() {
-    // Use the same bounds as world bounds (get from physics world)
-    const worldBounds = this.physics.world.bounds;
-    const boundsWidth = worldBounds.width;
-    const boundsHeight = worldBounds.height;
-    const lineWidth = 8;
-
-    const graphics = this.add.graphics();
-    graphics.lineStyle(lineWidth, 0xff0000, 1.0); // Bright red, fully opaque
-
-    // Draw boundary lines at the edges of the playable area
-    // These match the world bounds
-    // Top boundary (y = 0)
-    graphics.lineBetween(0, 0, boundsWidth, 0);
-    // Right boundary (x = boundsWidth)
-    graphics.lineBetween(boundsWidth, 0, boundsWidth, boundsHeight);
-    // Bottom boundary (y = boundsHeight)
-    graphics.lineBetween(boundsWidth, boundsHeight, 0, boundsHeight);
-    // Left boundary (x = 0)
-    graphics.lineBetween(0, boundsHeight, 0, 0);
-
-    // Generate as texture and create sprite so it persists
-    graphics.generateTexture("mapBoundaries", boundsWidth, boundsHeight);
-    graphics.destroy();
-
-    this.mapBounds = this.add.image(0, 0, "mapBoundaries");
-    this.mapBounds.setOrigin(0, 0);
-    this.mapBounds.setDepth(-1); // Behind everything but visible
-  }
-
-  private updateMapBoundaries() {
-    // Boundaries are static, no need to update
-    // But ensure they're visible
-    if (this.mapBounds) {
-      this.mapBounds.setVisible(true);
-    }
-  }
-
-  private createWorldBoundaryLines(width: number, height: number) {
-    // Create graphics for world boundary lines (where player collides)
-    const graphics = this.add.graphics();
-    graphics.lineStyle(4, 0x00ff00, 1.0); // Green lines for world bounds
-
-    // Draw boundary lines at the edges of the world
-    // Top boundary (y = 0)
-    graphics.lineBetween(0, 0, width, 0);
-    // Right boundary (x = width)
-    graphics.lineBetween(width, 0, width, height);
-    // Bottom boundary (y = height)
-    graphics.lineBetween(width, height, 0, height);
-    // Left boundary (x = 0)
-    graphics.lineBetween(0, height, 0, 0);
-
-    // Generate as texture and create sprite
-    graphics.generateTexture("worldBoundaries", width, height);
-    graphics.destroy();
-
-    const worldBoundsSprite = this.add.image(0, 0, "worldBoundaries");
-    worldBoundsSprite.setOrigin(0, 0);
-    worldBoundsSprite.setDepth(-2); // Behind map boundaries but visible
-  }
+  // ----------------------------------------------------------------
+  // Gameplay
+  // ----------------------------------------------------------------
 
   private collectCoin(
     _player: Phaser.Types.Physics.Arcade.GameObjectWithBody,
-    coin: Phaser.Types.Physics.Arcade.GameObjectWithBody
+    coin: Phaser.Types.Physics.Arcade.GameObjectWithBody,
   ) {
-    const coinSprite = coin as Phaser.Physics.Arcade.Sprite;
-    coinSprite.destroy();
+    (coin as Phaser.Physics.Arcade.Sprite).destroy();
     this.collectedCoins++;
     this.updateCoinText();
-
-    // Check if all coins collected
-    if (this.collectedCoins >= this.totalCoins) {
-      this.completeMap();
-    }
+    if (this.collectedCoins >= this.totalCoins) this.completeMap();
   }
 
   private completeMap() {
-    if (this.currentMapIndex < 2) {
-      // Move to next map
-      this.mapCompleteText.setText("Map Complete!\nPress SPACE for next map");
+    const isLast = this.currentMapIndex >= getMapCount() - 1;
+    if (!isLast) {
+      this.mapCompleteText.setText('Map Complete!\nPress SPACE for next map');
       this.mapCompleteText.setVisible(true);
-
-      // Wait for space to continue
-      const spaceHandler = () => {
+      this.spaceKey.once('down', () => {
         this.mapCompleteText.setVisible(false);
         this.loadMap(this.currentMapIndex + 1);
-        this.spaceKey.off("down", spaceHandler);
-      };
-      this.spaceKey.once("down", spaceHandler);
+      });
     } else {
-      // All maps complete
-      this.mapCompleteText.setText("All Maps Complete!\nCongratulations!");
+      this.mapCompleteText.setText('All Maps Complete!\nCongratulations!');
       this.mapCompleteText.setVisible(true);
     }
   }
+
+  /** Read held arrow keys + Shift to determine target gravity. Shift must be held to rotate. */
+  private getTargetDirectionFromInput(): GravityDirection {
+    if (!this.shiftKey.isDown) return this.currentGravity;
+    if (this.cursors.up!.isDown)    return GravityDirection.Up;
+    if (this.cursors.down!.isDown)  return GravityDirection.Down;
+    if (this.cursors.left!.isDown)  return GravityDirection.Left;
+    if (this.cursors.right!.isDown) return GravityDirection.Right;
+    return this.currentGravity; // shift held but no arrow → plain jump
+  }
+
+  /** Fire the jump impulse (off current surface) and switch gravity to chosen direction. */
+  private executeJump(body: Phaser.Physics.Arcade.Body) {
+    DIRECTION_HANDLERS[this.currentGravity].applyJump(body);
+    this.setGravityDirection(this.pendingJumpDir);
+    this.onJump();
+  }
+
+  private setGravityDirection(dir: GravityDirection) {
+    this.currentGravity = dir;
+    this.cameras.main.setBackgroundColor(BG_COLORS[dir]);
+  }
+
+  /** Stretch the player sprite on jump, tween back to normal. */
+  private onJump() {
+    const { sx, sy } = this.getSquashScales(true);
+    this.player.setScale(sx, sy);
+    this.tweens.add({ targets: this.player, scaleX: 1, scaleY: 1, duration: 200, ease: 'Back.Out' });
+  }
+
+  /** Squash the player sprite on land, tween back to normal. */
+  private onLand() {
+    const { sx, sy } = this.getSquashScales(false);
+    this.player.setScale(sx, sy);
+    this.tweens.add({ targets: this.player, scaleX: 1, scaleY: 1, duration: 150, ease: 'Back.Out' });
+  }
+
+  /** Squash/stretch scales based on current gravity axis. */
+  private getSquashScales(isJump: boolean): { sx: number; sy: number } {
+    const isVertical = DIRECTION_HANDLERS[this.currentGravity].arrowVector.dy !== 0;
+    if (isVertical) {
+      return isJump ? { sx: 0.75, sy: 1.3 } : { sx: 1.3, sy: 0.75 };
+    } else {
+      return isJump ? { sx: 1.3, sy: 0.75 } : { sx: 0.75, sy: 1.3 };
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // Update loop
+  // ----------------------------------------------------------------
+
+  update() {
+    const body    = this.player.body as Phaser.Physics.Arcade.Body;
+    const handler = DIRECTION_HANDLERS[this.currentGravity];
+
+    handler.applyGravity(body);
+    handler.handleMovement(body, this.cursors, this.keyLeft, this.keyRight);
+
+    // Coyote time tracking
+    const grounded = handler.isGrounded(body);
+    if (grounded) this.lastGroundedTime = this.time.now;
+
+    // Landing squash (only after being airborne)
+    if (!this.wasGrounded && grounded) this.onLand();
+    this.wasGrounded = grounded;
+
+    // Buffer the jump intent + chosen gravity direction at press time
+    if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
+      this.jumpBufferTime   = this.time.now;
+      this.pendingJumpDir   = this.getTargetDirectionFromInput();
+    }
+
+    // Fire jump if grounded (or coyote) and buffer is hot
+    const canJump   = grounded || (this.time.now - this.lastGroundedTime < COYOTE_MS);
+    const bufferHot = this.time.now - this.jumpBufferTime < JUMP_BUFFER_MS;
+    if (canJump && bufferHot) {
+      this.executeJump(body);
+      this.lastGroundedTime = -Infinity; // consume coyote
+      this.jumpBufferTime   = -Infinity; // consume buffer
+    }
+
+    this.drawHUD();
+  }
+
+  // ----------------------------------------------------------------
+  // HUD drawing
+  // ----------------------------------------------------------------
+
+  private drawHUD() {
+    const cam = this.cameras.main;
+    this.gravityIndicator.clear();
+    const cx = cam.width - INDICATOR.COMPASS_X;
+    const cy = INDICATOR.COMPASS_Y;
+    for (let dir = 0; dir < 4; dir++) {
+      this.drawGravityArrow(cx, cy, dir as GravityDirection, dir !== this.currentGravity);
+    }
+  }
+
+  /**
+   * Draw one gravity arrow using a vector-based approach —
+   * no per-direction switch statement needed.
+   *
+   * The arrow shaft runs from (x, y) in the gravity direction.
+   * The arrowhead chevron is formed by two lines from the tip,
+   * angled via the perpendicular vector.
+   */
+  private drawGravityArrow(x: number, y: number, dir: GravityDirection, isNext: boolean) {
+    const g         = this.gravityIndicator;
+    const scale     = isNext ? INDICATOR.NEXT_SCALE : 1;
+    const lineWidth = isNext ? INDICATOR.NEXT_LINE_WIDTH : INDICATOR.CURRENT_LINE_WIDTH;
+    const color     = isNext ? COLOR.INDICATOR_NEXT    : COLOR.INDICATOR_CURRENT;
+    const arrowSize = INDICATOR.ARROW_SIZE * scale;
+    const headSize  = INDICATOR.HEAD_SIZE  * scale;
+
+    g.lineStyle(lineWidth, color);
+
+    const { dx, dy } = DIRECTION_HANDLERS[dir].arrowVector;
+    const ex = x + dx * arrowSize;
+    const ey = y + dy * arrowSize;
+    const px = -dy; // perpendicular unit vector
+    const py =  dx;
+
+    g.lineBetween(x, y, ex, ey);
+    g.lineBetween(ex, ey, ex - dx * headSize + px * headSize, ey - dy * headSize + py * headSize);
+    g.lineBetween(ex, ey, ex - dx * headSize - px * headSize, ey - dy * headSize - py * headSize);
+  }
+
+  // ----------------------------------------------------------------
+  // Helpers
+  // ----------------------------------------------------------------
 
   private updateCoinText() {
     this.coinCountText.setText(`Coins: ${this.collectedCoins}/${this.totalCoins}`);
   }
 
-  private updateGravityIndicator() {
-    // This method is called when gravity changes
-    // The actual drawing happens in update() at the correct camera-relative position
+  private drawBoundaryRect(
+    x: number, y: number, w: number, h: number,
+    color: number, lineWidth: number, depth: number,
+  ) {
+    const g = this.add.graphics();
+    g.lineStyle(lineWidth, color, 1);
+    g.strokeRect(x, y, w, h);
+    g.setDepth(depth);
   }
 
-  private rotateGravity() {
-    // Rotate clockwise: Down → Right → Up → Left → Down
-    this.currentGravity = (this.currentGravity + 1) % 4;
-    this.updateGravityIndicator();
+  /** Create shared player and coin textures (no-ops if already cached). */
+  private ensureSharedTextures() {
+    if (!this.textures.exists('player')) {
+      const g = this.add.graphics();
+      g.fillStyle(COLOR.PLAYER_BODY);   g.fillRect(0, 0, PLAYER_W, PLAYER_H);
+      g.fillStyle(COLOR.PLAYER_DETAIL); g.fillRect(4, 4, 16, 24);
+      g.generateTexture('player', PLAYER_W, PLAYER_H);
+      g.destroy();
+    }
 
-    // Update background color subtly
-    const colors = [0x1a1a2e, 0x2e1a2e, 0x2e2e1a, 0x1a2e2e];
-    this.cameras.main.setBackgroundColor(colors[this.currentGravity]);
-  }
-
-  private applyGravity() {
-    const body = this.player.body as Phaser.Physics.Arcade.Body;
-
-    // Reset gravity forces
-    body.setGravity(0, 0);
-
-    // Apply gravity based on current direction
-    // Use consistent force value in all directions
-    switch (this.currentGravity) {
-      case GravityDirection.Down:
-        body.setGravityY(this.gravityForce);
-        break;
-      case GravityDirection.Right:
-        body.setGravityX(this.gravityForce);
-        break;
-      case GravityDirection.Up:
-        body.setGravityY(-this.gravityForce);
-        break;
-      case GravityDirection.Left:
-        body.setGravityX(-this.gravityForce);
-        break;
+    if (!this.textures.exists('coin')) {
+      const g = this.add.graphics();
+      g.fillStyle(COLOR.COIN_OUTER); g.fillCircle(COIN_RADIUS, COIN_RADIUS, COIN_RADIUS);
+      g.fillStyle(COLOR.COIN_INNER); g.fillCircle(COIN_RADIUS, COIN_RADIUS, 12);
+      g.generateTexture('coin', COIN_SIZE, COIN_SIZE);
+      g.destroy();
     }
   }
 
-  private handleJump() {
-    const body = this.player.body as Phaser.Physics.Arcade.Body;
-
-    // Check if player is on ground (touching a platform in the direction opposite to gravity)
-    let isOnGround = false;
-
-    switch (this.currentGravity) {
-      case GravityDirection.Down:
-        isOnGround = body.blocked.down || body.touching.down;
-        break;
-      case GravityDirection.Right:
-        // When gravity is right, player stands on left side of platform
-        isOnGround = body.blocked.right || body.touching.right;
-        break;
-      case GravityDirection.Up:
-        isOnGround = body.blocked.up || body.touching.up;
-        break;
-      case GravityDirection.Left:
-        // When gravity is left, player stands on right side of platform
-        isOnGround = body.blocked.left || body.touching.left;
-        break;
+  /** Create a platform texture keyed by dimensions — identical sizes share one texture. */
+  private ensurePlatformTexture(width: number, height: number): string {
+    const key = `platform_${width}x${height}`;
+    if (!this.textures.exists(key)) {
+      const g = this.add.graphics();
+      g.fillStyle(COLOR.PLATFORM);
+      g.fillRect(0, 0, width, height);
+      g.generateTexture(key, width, height);
+      g.destroy();
     }
-
-    if (isOnGround) {
-      // Apply jump force opposite to gravity direction
-      switch (this.currentGravity) {
-        case GravityDirection.Down:
-          body.setVelocityY(-this.jumpForce);
-          break;
-        case GravityDirection.Right:
-          body.setVelocityX(-this.jumpForce);
-          break;
-        case GravityDirection.Up:
-          body.setVelocityY(this.jumpForce);
-          break;
-        case GravityDirection.Left:
-          body.setVelocityX(this.jumpForce);
-          break;
-      }
-
-      // Rotate gravity
-      this.rotateGravity();
-    }
-  }
-
-  update() {
-    // Apply gravity
-    this.applyGravity();
-
-    const body = this.player.body as Phaser.Physics.Arcade.Body;
-    const leftKey = this.input.keyboard!.addKey("A");
-    const rightKey = this.input.keyboard!.addKey("D");
-
-    // Handle movement relative to player's orientation (not screen)
-    // Arrow keys are relative to the surface the player is standing on
-    switch (this.currentGravity) {
-      case GravityDirection.Down:
-        // Normal: Left/Right move horizontally, Up is jump
-        if (this.cursors.left!.isDown || this.input.keyboard!.checkDown(leftKey)) {
-          this.player.setVelocityX(-200);
-        } else if (this.cursors.right!.isDown || this.input.keyboard!.checkDown(rightKey)) {
-          this.player.setVelocityX(200);
-        } else {
-          body.setVelocityX(Phaser.Math.Linear(body.velocity.x, 0, 0.1));
-        }
-        // Up arrow or Space is jump
-        if (Phaser.Input.Keyboard.JustDown(this.spaceKey) || Phaser.Input.Keyboard.JustDown(this.cursors.up!)) {
-          this.handleJump();
-        }
-        break;
-
-      case GravityDirection.Right:
-        // Standing on right wall: Up/Down move vertically along wall, Left is jump
-        if (this.cursors.up!.isDown) {
-          body.setVelocityY(-200);
-        } else if (this.cursors.down!.isDown) {
-          body.setVelocityY(200);
-        } else {
-          body.setVelocityY(Phaser.Math.Linear(body.velocity.y, 0, 0.1));
-        }
-        // Left arrow or Space is jump
-        if (Phaser.Input.Keyboard.JustDown(this.spaceKey) || Phaser.Input.Keyboard.JustDown(this.cursors.left!)) {
-          this.handleJump();
-        }
-        break;
-
-      case GravityDirection.Up:
-        // On ceiling: Left/Right move horizontally, Down is jump
-        if (this.cursors.left!.isDown || this.input.keyboard!.checkDown(leftKey)) {
-          this.player.setVelocityX(-200);
-        } else if (this.cursors.right!.isDown || this.input.keyboard!.checkDown(rightKey)) {
-          this.player.setVelocityX(200);
-        } else {
-          body.setVelocityX(Phaser.Math.Linear(body.velocity.x, 0, 0.1));
-        }
-        // Down arrow or Space is jump
-        if (Phaser.Input.Keyboard.JustDown(this.spaceKey) || Phaser.Input.Keyboard.JustDown(this.cursors.down!)) {
-          this.handleJump();
-        }
-        break;
-
-      case GravityDirection.Left:
-        // Standing on left wall: Up/Down move vertically along wall, Right is jump
-        if (this.cursors.up!.isDown) {
-          body.setVelocityY(-200);
-        } else if (this.cursors.down!.isDown) {
-          body.setVelocityY(200);
-        } else {
-          body.setVelocityY(Phaser.Math.Linear(body.velocity.y, 0, 0.1));
-        }
-        // Right arrow or Space is jump
-        if (Phaser.Input.Keyboard.JustDown(this.spaceKey) || Phaser.Input.Keyboard.JustDown(this.cursors.right!)) {
-          this.handleJump();
-        }
-        break;
-    }
-
-    // Update UI positions (relative to camera viewport)
-    const cam = this.cameras.main;
-    this.gravityIndicator.clear();
-
-    // Position indicators fixed to screen (camera-relative)
-    const currentIndicatorX = cam.width - 80;
-    const nextIndicatorX = cam.width - 40;
-    const indicatorY = 30;
-
-    // Draw current gravity indicator
-    this.drawGravityIndicator(currentIndicatorX, indicatorY, this.currentGravity, false);
-
-    // Draw next gravity direction (to the right, smaller, grey)
-    const nextGravity = (this.currentGravity + 1) % 4;
-    this.drawGravityIndicator(nextIndicatorX, indicatorY, nextGravity, true);
-
-    this.coinCountText.setPosition(20, 20);
-  }
-
-  private drawGravityIndicator(x: number, y: number, direction: GravityDirection, isNext: boolean) {
-    // Set style based on whether it's current or next
-    const lineWidth = isNext ? 2 : 4;
-    const color = isNext ? 0x888888 : 0xffffff; // Grey for next, white for current
-    const scale = isNext ? 0.6 : 1.0; // Smaller for next
-
-    this.gravityIndicator.lineStyle(lineWidth, color);
-    const arrowSize = 15 * scale;
-    const headSize = 8 * scale;
-
-    switch (direction) {
-      case GravityDirection.Down:
-        // Arrow pointing down (gravity pulls down)
-        // Draw shaft from top to bottom
-        this.gravityIndicator.lineBetween(x, y, x, y + arrowSize);
-        // Draw arrowhead pointing down
-        this.gravityIndicator.lineBetween(x, y + arrowSize, x - headSize, y + arrowSize - headSize);
-        this.gravityIndicator.lineBetween(x, y + arrowSize, x + headSize, y + arrowSize - headSize);
-        break;
-      case GravityDirection.Right:
-        // Arrow pointing right (gravity pulls right)
-        // Draw shaft from left to right
-        this.gravityIndicator.lineBetween(x, y, x + arrowSize, y);
-        // Draw arrowhead pointing right
-        this.gravityIndicator.lineBetween(x + arrowSize, y, x + arrowSize - headSize, y - headSize);
-        this.gravityIndicator.lineBetween(x + arrowSize, y, x + arrowSize - headSize, y + headSize);
-        break;
-      case GravityDirection.Up:
-        // Arrow pointing up (gravity pulls up)
-        // Draw shaft from bottom to top
-        this.gravityIndicator.lineBetween(x, y + arrowSize, x, y);
-        // Draw arrowhead pointing up
-        this.gravityIndicator.lineBetween(x, y, x - headSize, y + headSize);
-        this.gravityIndicator.lineBetween(x, y, x + headSize, y + headSize);
-        break;
-      case GravityDirection.Left:
-        // Arrow pointing left (gravity pulls left)
-        // Draw shaft from right to left
-        this.gravityIndicator.lineBetween(x + arrowSize, y, x, y);
-        // Draw arrowhead pointing left
-        this.gravityIndicator.lineBetween(x, y, x + headSize, y - headSize);
-        this.gravityIndicator.lineBetween(x, y, x + headSize, y + headSize);
-        break;
-    }
+    return key;
   }
 }
 
-/**
- * Factory function to create the Gravity Rotating Platformer game config
- */
 export const createGravityGame = (): GameConfig => {
-  const config = createGameConfig(
-    "Gravity Rotator",
-    GravityGameScene,
-    {
-      physics: {
-        default: "arcade",
-        arcade: {
-          gravity: { x: 0, y: 0 }, // We handle gravity manually
-          debug: false,
-        },
-      },
-    }
-  );
-  config.bannerArt = getAssetPath("/images/games/gravity-rotator/banner.png");
-  config.screenArt = getAssetPath("/images/games/gravity-rotator/screen.png");
+  const config = createGameConfig('Gravity Rotator', GravityGameScene, {
+    physics: {
+      default: 'arcade',
+      arcade: { gravity: { x: 0, y: 0 }, debug: false },
+    },
+  });
+  config.bannerArt = getAssetPath('/images/games/gravity-rotator/banner.png');
+  config.screenArt = getAssetPath('/images/games/gravity-rotator/screen.png');
   return config;
 };
-

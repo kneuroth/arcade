@@ -1,5 +1,12 @@
 import { Game, Types, Scene } from 'phaser'
 
+export interface GameEvent {
+  type: string
+  payload?: unknown
+}
+
+export type GameEventCallback = (event: GameEvent) => void
+
 export interface MobileConfig {
   /** Whether the game is optimized for mobile devices */
   isMobileCompatible: boolean
@@ -52,12 +59,11 @@ export const createGameConfig = (
       let sceneInstance: Scene | Scene[]
 
       if (typeof scene === 'function') {
-        // Check if it's a class constructor or factory function
-        try {
-          // Try to instantiate as class
+        // Distinguish class constructor from factory function via prototype check
+        const proto = (scene as Function).prototype
+        if (proto && proto.constructor === scene) {
           sceneInstance = new (scene as new (...args: any[]) => Scene)()
-        } catch {
-          // If that fails, call as factory function
+        } else {
           sceneInstance = (scene as () => Scene)()
         }
       } else {
