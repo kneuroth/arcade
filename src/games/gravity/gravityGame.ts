@@ -8,7 +8,7 @@ import {
   PLAYER_W, PLAYER_H, COIN_SIZE, COIN_RADIUS, INDICATOR,
   COYOTE_MS, JUMP_BUFFER_MS,
 } from './constants';
-import { GravityDirection, DIRECTION_HANDLERS } from './gravityDirections';
+import { GravityDirection, DIRECTION_HANDLERS, oppositeDirection } from './gravityDirections';
 
 class GravityGameScene extends BaseGameScene {
   private player!: Phaser.Physics.Arcade.Sprite;
@@ -18,7 +18,6 @@ class GravityGameScene extends BaseGameScene {
   private keyLeft!: Phaser.Input.Keyboard.Key;
   private keyRight!: Phaser.Input.Keyboard.Key;
   private spaceKey!: Phaser.Input.Keyboard.Key;
-  private shiftKey!: Phaser.Input.Keyboard.Key;
   private currentGravity: GravityDirection = GravityDirection.Down;
   private gravityIndicator!: Phaser.GameObjects.Graphics;
   private coinCountText!: Phaser.GameObjects.Text;
@@ -27,9 +26,9 @@ class GravityGameScene extends BaseGameScene {
   private collectedCoins = 0;
   private currentMapIndex = 0;
   private lastGroundedTime = -Infinity; // timestamp when last grounded (for coyote)
-  private jumpBufferTime   = -Infinity; // timestamp when Space was pressed (buffer)
-  private pendingJumpDir   = GravityDirection.Down; // gravity dir chosen at jump press
+  private jumpBufferTime   = -Infinity; // timestamp when jump key was pressed (buffer)
   private wasGrounded      = true;      // previous frame grounded state (for land detection)
+  private wasJumpKeyDown   = false;     // previous frame jump key state (for just-pressed detection)
 
   constructor() {
     super({ key: 'GravityGame' });
@@ -73,7 +72,6 @@ class GravityGameScene extends BaseGameScene {
     this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.keyLeft  = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A);
     this.keyRight = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D);
-    this.shiftKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
 
     // Shared textures created once; reused across every map load
     this.ensureSharedTextures();
@@ -155,6 +153,7 @@ class GravityGameScene extends BaseGameScene {
     this.lastGroundedTime = -Infinity;
     this.jumpBufferTime   = -Infinity;
     this.wasGrounded      = true;
+    this.wasJumpKeyDown   = false;
     this.cameras.main.startFollow(this.player);
   }
 
@@ -187,20 +186,18 @@ class GravityGameScene extends BaseGameScene {
     }
   }
 
-  /** Read held arrow keys + Shift to determine target gravity. Shift must be held to rotate. */
+  /** Read held arrow keys to determine Space gravity target. No arrow held → 180° flip. */
   private getTargetDirectionFromInput(): GravityDirection {
-    if (!this.shiftKey.isDown) return this.currentGravity;
     if (this.cursors.up!.isDown)    return GravityDirection.Up;
     if (this.cursors.down!.isDown)  return GravityDirection.Down;
     if (this.cursors.left!.isDown)  return GravityDirection.Left;
     if (this.cursors.right!.isDown) return GravityDirection.Right;
-    return this.currentGravity; // shift held but no arrow → plain jump
+    return oppositeDirection(this.currentGravity);
   }
 
-  /** Fire the jump impulse (off current surface) and switch gravity to chosen direction. */
+  /** Fire the jump impulse off the current surface (no gravity change). */
   private executeJump(body: Phaser.Physics.Arcade.Body) {
     DIRECTION_HANDLERS[this.currentGravity].applyJump(body);
-    this.setGravityDirection(this.pendingJumpDir);
     this.onJump();
   }
 
@@ -252,10 +249,18 @@ class GravityGameScene extends BaseGameScene {
     if (!this.wasGrounded && grounded) this.onLand();
     this.wasGrounded = grounded;
 
-    // Buffer the jump intent + chosen gravity direction at press time
+    // Detect jump key just-pressed (opposite arrow to current gravity)
+    const jumpKeyDown = handler.isJumpPressed(this.cursors);
+    if (jumpKeyDown && !this.wasJumpKeyDown) {
+      this.jumpBufferTime = this.time.now;
+    }
+    this.wasJumpKeyDown = jumpKeyDown;
+
+    // Space: change gravity (directional or 180° flip), clear jump state
     if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
-      this.jumpBufferTime   = this.time.now;
-      this.pendingJumpDir   = this.getTargetDirectionFromInput();
+      this.setGravityDirection(this.getTargetDirectionFromInput());
+      this.jumpBufferTime   = -Infinity; // prevent phantom jump on gravity change
+      this.lastGroundedTime = -Infinity;
     }
 
     // Fire jump if grounded (or coyote) and buffer is hot

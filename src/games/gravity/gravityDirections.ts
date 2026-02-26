@@ -22,6 +22,8 @@ export interface DirectionHandler {
   handleMovement(body: Body, cursors: Cursors, altNeg: Key, altPos: Key): void;
   /** Unit direction vector used to draw the gravity arrow in the HUD */
   arrowVector: { dx: number; dy: number };
+  /** True when the jump key for this gravity direction is held */
+  isJumpPressed(cursors: Cursors): boolean;
 }
 
 /**
@@ -39,7 +41,8 @@ export const DIRECTION_HANDLERS: Record<GravityDirection, DirectionHandler> = {
       else if (cursors.right!.isDown || altPos.isDown) body.setVelocityX( MOVE_SPEED);
       else body.setVelocityX(Phaser.Math.Linear(body.velocity.x, 0, FRICTION));
     },
-    arrowVector: { dx: 0, dy: 1 },
+    arrowVector:    { dx: 0, dy: 1 },
+    isJumpPressed:  (cursors) => cursors.up!.isDown,
   },
 
   [GravityDirection.Right]: {
@@ -51,7 +54,8 @@ export const DIRECTION_HANDLERS: Record<GravityDirection, DirectionHandler> = {
       else if (cursors.down!.isDown) body.setVelocityY( MOVE_SPEED);
       else body.setVelocityY(Phaser.Math.Linear(body.velocity.y, 0, FRICTION));
     },
-    arrowVector: { dx: 1, dy: 0 },
+    arrowVector:    { dx: 1, dy: 0 },
+    isJumpPressed:  (cursors) => cursors.left!.isDown,
   },
 
   [GravityDirection.Up]: {
@@ -63,7 +67,8 @@ export const DIRECTION_HANDLERS: Record<GravityDirection, DirectionHandler> = {
       else if (cursors.right!.isDown || altPos.isDown) body.setVelocityX( MOVE_SPEED);
       else body.setVelocityX(Phaser.Math.Linear(body.velocity.x, 0, FRICTION));
     },
-    arrowVector: { dx: 0, dy: -1 },
+    arrowVector:    { dx: 0, dy: -1 },
+    isJumpPressed:  (cursors) => cursors.down!.isDown,
   },
 
   [GravityDirection.Left]: {
@@ -75,7 +80,8 @@ export const DIRECTION_HANDLERS: Record<GravityDirection, DirectionHandler> = {
       else if (cursors.down!.isDown) body.setVelocityY( MOVE_SPEED);
       else body.setVelocityY(Phaser.Math.Linear(body.velocity.y, 0, FRICTION));
     },
-    arrowVector: { dx: -1, dy: 0 },
+    arrowVector:    { dx: -1, dy: 0 },
+    isJumpPressed:  (cursors) => cursors.right!.isDown,
   },
 };
 
