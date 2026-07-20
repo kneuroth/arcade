@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import PhaserGame from "./PhaserGame";
+import MobileWarning from "./MobileWarning";
 import { GameConfig, GameEventCallback } from "../types/game";
+import { useIsMobile } from "../hooks/useIsMobile";
 
 interface ArcadeMachineProps {
   gameConfig?: GameConfig;
@@ -15,7 +17,12 @@ function ArcadeMachine({
   onGameEvent,
 }: ArcadeMachineProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [playAnyway, setPlayAnyway] = useState(false);
   const screenRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
+
+  // On mobile, warn before loading the game unless the user opts in.
+  const showMobileWarning = isMobile && !playAnyway;
 
   const handleSelectGame = () => {
     if (gameConfig) {
@@ -25,6 +32,7 @@ function ArcadeMachine({
 
   const handleClose = () => {
     setIsExpanded(false);
+    setPlayAnyway(false);
   };
 
   // Handle escape key to close
@@ -49,12 +57,6 @@ function ArcadeMachine({
             <h2 className="text-xl md:text-2xl font-bold text-white">
               {gameConfig?.name || gameName}
             </h2>
-            {gameConfig?.mobile?.isMobileCompatible && (
-              <div className="flex items-center gap-1 bg-green-600/20 text-green-400 text-xs px-2 py-1 rounded">
-                <span>📱</span>
-                <span>Mobile</span>
-              </div>
-            )}
           </div>
           <button
             onClick={handleClose}
@@ -67,7 +69,9 @@ function ArcadeMachine({
           ref={screenRef}
           className="bg-black rounded-lg aspect-video border-4 border-gray-700 overflow-hidden"
         >
-          {gameConfig ? (
+          {gameConfig && showMobileWarning ? (
+            <MobileWarning variant="screen" onContinue={() => setPlayAnyway(true)} />
+          ) : gameConfig ? (
             <PhaserGame gameConfig={gameConfig} isActive={isExpanded} onGameEvent={onGameEvent} />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
@@ -100,13 +104,6 @@ function ArcadeMachine({
           ) : (
             <div className="text-gray-300 text-[8px] md:text-xs text-center px-2">
               {gameConfig?.name || gameName || "Coming Soon!"}
-            </div>
-          )}
-          {/* Mobile Compatibility Badge */}
-          {gameConfig?.mobile?.isMobileCompatible && (
-            <div className="absolute top-1 right-2 md:top-2 md:right-3 bg-green-600 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 z-20 shadow-lg">
-              <span>📱</span>
-              <span className="hidden sm:inline">Mobile</span>
             </div>
           )}
         </div>

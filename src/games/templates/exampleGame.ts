@@ -27,13 +27,10 @@ class ExampleGameScene extends Scene {
     )
     text.setOrigin(0.5)
 
-    // Example: Add click/touch handler (works on both desktop and mobile)
+    // Example: Add click handler
     this.input.on('pointerdown', () => {
       text.setText('Game Started!')
     })
-
-    // For mobile: pointerdown handles both mouse clicks and touch events
-    // You can also use this.input.on('pointerup') or this.input.on('pointermove')
   }
 }
 
@@ -44,26 +41,9 @@ class ExampleGameScene extends Scene {
  * Usage in App.tsx:
  * import { createExampleGame } from './games/templates/exampleGame'
  * <ArcadeMachine gameConfig={createExampleGame()} />
- * 
- * To make a game mobile-compatible, pass the mobile config:
- * return createGameConfig('My Game', MyGameScene, undefined, {
- *   isMobileCompatible: true,
- *   usesTouchControls: true,
- *   mobileDescription: 'Tap to play!'
- * })
  */
 export const createExampleGame = (): GameConfig => {
-  const config = createGameConfig(
-    'Example Game',
-    ExampleGameScene,
-    undefined,
-    {
-      isMobileCompatible: true,
-      usesTouchControls: true,
-      mobileDescription: 'Tap anywhere to start playing',
-      minWidth: 320,
-    }
-  );
+  const config = createGameConfig('Example Game', ExampleGameScene);
 
   // Add art assets (optional)
   // config.bannerArt = '/images/games/example/banner.png';

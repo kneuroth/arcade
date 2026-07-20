@@ -27,37 +27,12 @@ export const createSnakeGame = (): GameConfig => {
 }
 ```
 
-### Mobile-Compatible Games
+### A Note on Mobile
 
-To make your game work well on mobile devices, pass a mobile configuration:
-
-```typescript
-export const createSnakeGame = (): GameConfig => {
-  return createGameConfig(
-    'Snake Game',
-    SnakeGameScene,
-    undefined, // Optional Phaser game config
-    {
-      isMobileCompatible: true,
-      usesTouchControls: true,
-      mobileDescription: 'Swipe to control the snake',
-      minWidth: 320, // Minimum screen width (default: 320)
-    }
-  )
-}
-```
-
-**Mobile Configuration Options:**
-- `isMobileCompatible`: Set to `true` to mark the game as mobile-optimized
-- `usesTouchControls`: Indicates the game uses touch/gesture controls
-- `mobileDescription`: Brief description shown on the arcade machine
-- `minWidth`: Minimum recommended screen width (default: 320px)
-
-When a game is marked as mobile-compatible:
-- ✅ A mobile badge appears on the arcade machine
-- ✅ Touch input is automatically enabled in Phaser
-- ✅ The game uses smaller default dimensions (320x480 vs 800x600)
-- ✅ Users see mobile compatibility info before playing
+The arcade is designed for desktop (keyboard/mouse, wide screen). Games are
+**not** built for mobile — small/touch devices see a warning steering them to a
+computer (`src/components/MobileWarning.tsx`, driven by the `useIsMobile` hook).
+Don't add mobile-specific config to games; build for desktop.
 
 2. **Use it in your App.tsx**:
 

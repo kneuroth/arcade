@@ -971,17 +971,7 @@ class PongGameScene extends Scene {
  * <ArcadeMachine gameConfig={createPongGame()} />
  */
 export const createPongGame = (): GameConfig => {
-  const config = createGameConfig(
-    "Paddle Master",
-    PongGameScene,
-    undefined,
-    {
-      isMobileCompatible: true,
-      usesTouchControls: true,
-      mobileDescription: "Drag to move your paddle. Longer rallies = faster ball & shining jewel trails!",
-      minWidth: 320,
-    }
-  );
+  const config = createGameConfig("Paddle Master", PongGameScene);
   config.bannerArt = getAssetPath("/images/games/pong/banner.png");
   config.screenArt = getAssetPath("/images/games/pong/screen.png");
   return config;

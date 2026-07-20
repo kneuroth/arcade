@@ -291,10 +291,6 @@ export const createBMXGame = (): GameConfig => {
           debug: false, // Set to true to see collision boxes
         },
       },
-    },
-    {
-      isMobileCompatible: false,
-      usesTouchControls: false,
     }
   );
 };

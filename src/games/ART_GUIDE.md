@@ -32,19 +32,10 @@ This guide provides specifications for game art assets used in arcade machines.
 
 ```typescript
 export const createMyGame = (): GameConfig => {
-  return createGameConfig(
-    "My Game",
-    MyGameScene,
-    undefined,
-    {
-      isMobileCompatible: true,
-      // ... mobile config
-    },
-    {
-      bannerArt: "/images/games/my-game/banner.png",
-      screenArt: "/images/games/my-game/screen.png",
-    }
-  );
+  const config = createGameConfig("My Game", MyGameScene);
+  config.bannerArt = "/images/games/my-game/banner.png";
+  config.screenArt = "/images/games/my-game/screen.png";
+  return config;
 };
 ```
 

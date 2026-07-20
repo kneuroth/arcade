@@ -7,22 +7,9 @@ export interface GameEvent {
 
 export type GameEventCallback = (event: GameEvent) => void
 
-export interface MobileConfig {
-  /** Whether the game is optimized for mobile devices */
-  isMobileCompatible: boolean
-  /** Minimum recommended screen width in pixels (default: 320) */
-  minWidth?: number
-  /** Whether the game uses touch controls */
-  usesTouchControls?: boolean
-  /** Description of mobile-specific features or controls */
-  mobileDescription?: string
-}
-
 export interface GameConfig {
   name: string
   createGame: (container: HTMLElement) => Game
-  /** Mobile compatibility information */
-  mobile?: MobileConfig
   /** Banner art image URL (recommended size: 600x150px, 4:1 aspect ratio) */
   bannerArt?: string
   /** Screen art image URL shown when game is not active (recommended size: 800x450px, 16:9 aspect ratio) */
@@ -43,17 +30,14 @@ export interface ArcadeGame {
  * @param name - Display name of the game
  * @param scene - Phaser Scene class, instance, array, or factory function
  * @param config - Optional additional Phaser game configuration
- * @param mobile - Optional mobile compatibility configuration
  */
 export const createGameConfig = (
   name: string,
   scene: Scene | Scene[] | (() => Scene) | (new (...args: any[]) => Scene),
-  config?: Partial<Types.Core.GameConfig>,
-  mobile?: MobileConfig
+  config?: Partial<Types.Core.GameConfig>
 ): GameConfig => {
   return {
     name,
-    mobile,
     createGame: (container: HTMLElement) => {
       // Handle different scene input types
       let sceneInstance: Scene | Scene[]
@@ -70,24 +54,15 @@ export const createGameConfig = (
         sceneInstance = scene
       }
 
-      // Mobile-optimized defaults if mobile compatible
-      const isMobile = mobile?.isMobileCompatible
-      const defaultWidth = isMobile ? (mobile?.minWidth || 320) : 800
-      const defaultHeight = isMobile ? 480 : 600
-
       const gameConfig: Types.Core.GameConfig = {
         type: Phaser.AUTO,
-        width: container.clientWidth || defaultWidth,
-        height: container.clientHeight || defaultHeight,
+        width: container.clientWidth || 800,
+        height: container.clientHeight || 600,
         parent: container,
         backgroundColor: '#000000',
         scale: {
           mode: Phaser.Scale.RESIZE,
           autoCenter: Phaser.Scale.CENTER_BOTH,
-        },
-        // Enable touch input if mobile compatible
-        input: {
-          ...(isMobile && { touch: true, activePointers: 2 }),
         },
         ...config,
         scene: sceneInstance,
